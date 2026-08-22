@@ -85,7 +85,7 @@ The project focuses on practical DBA operations such as:
 
 ## Phase 1: Virtual Infrastructure Provisioning
 
-The first phase was to create the virtual infrastructure required for the Oracle Database lab.
+ Set up the underlying server hardware and operating system required for Oracle 19c.
 
 **Tool Used:** Oracle VM VirtualBox
 
@@ -94,7 +94,6 @@ The first phase was to create the virtual infrastructure required for the Oracle
 ### Step 1.1: Create Oracle Linux Virtual Machine
 
 A new virtual machine was created in Oracle VM VirtualBox using Oracle Linux 8.
-
 The Oracle Linux ISO was attached to the virtual machine for operating system installation.
 
 ![Virtual Machine Creation](images/1.orcl.png)
@@ -103,9 +102,8 @@ The Oracle Linux ISO was attached to the virtual machine for operating system in
 
 ### Step 1.2: Configure Unattended Installation
 
-The unattended installation configuration was set up for Oracle Linux.
-
-The initial user and hostname were configured during this process.
+Configured the unattended guest OS setup to automate the Linux installation.
+We defined the default user as `kushal` and set the hostname to `OLinux8`.
 
 ![Unattended Installation Setup](images/2.orcl.PNG)
 
@@ -113,14 +111,7 @@ The initial user and hostname were configured during this process.
 
 ### Step 1.3: Configure Virtual Storage
 
-A dynamically allocated virtual hard disk was created for the Oracle Linux environment.
-
-This storage is used for:
-
-- Oracle Linux operating system
-- Oracle software
-- Oracle database files
-- Datafiles and tablespaces
+Allocated a 20.00 GB dynamically allocated Virtual Hard Disk (VDI) to ensure sufficient space for OS, Oracle binaries, and database files.
 
 ![Virtual Storage Allocation](images/3.orcl.png)
 
@@ -128,13 +119,7 @@ This storage is used for:
 
 ### Step 1.4: Configure VM Hardware
 
-The virtual machine hardware configuration was reviewed before starting the installation.
-
-The environment was configured with:
-
-- Approximately 5 GB RAM
-- 2 CPU cores
-- Virtual storage for Oracle Linux and Oracle Database
+Finalized the VM specifications, allocating 5112 MB (5 GB) of Base Memory (RAM) and 2 CPU cores to meet Oracle 19c's minimum enterprise requirements.
 
 ![Virtual Machine Hardware Configuration](images/4.orcl.png)
 
@@ -142,78 +127,62 @@ The environment was configured with:
 
 ### Step 1.5: Boot Oracle Linux
 
-After completing the VM configuration, Oracle Linux 8 was successfully booted.
+Successfully booted into Oracle Linux 8 and reached the login screen for the OS administrator user (`kushal`).
 
-![Oracle Linux First Boot](images/4.2.orcl.jpg)
+![Oracle Linux First Boot](images/4.2.orcl.png)
 
 ---
 
 # Phase 2: Oracle Linux & Oracle User Configuration
 
 After the operating system was available, the Oracle Database environment was prepared.
+Prepare the Linux environment by creating necessary Oracle groups, users, and resolving GUI access for the installer.
 
 **Tool Used:** Oracle Linux 8 Terminal
 
 ---
 
-### Step 2.1: Create Oracle Groups
+### Step 2.1: Create Oracle Groups and Oracle User
 
-The standard Oracle groups were created.
-
+Logged in as `root` to create the standard Oracle inventory and database administrator groups, followed by the `oracle` software owner user.
+**Commands Executed:**
 ```bash
 groupadd oinstall
 groupadd dba
-```
-
-`oinstall` is generally used as the Oracle Inventory group, while `dba` provides database administration privileges.
-
----
-
-### Step 2.2: Create Oracle Software Owner
-
-The Oracle software owner was created and assigned to the required groups.
-
-```bash
 useradd -g oinstall -G dba oracle
-```
-
-A password was then configured for the Oracle user.
-
-```bash
 passwd oracle
+
+
 ```
+The standard Oracle groups were created.
+---
 
-The Oracle user and group configuration was verified.
-
-```bash
-id oracle
-```
-
-![Oracle User and Group Configuration](images/5.png)
+![Oracle User and Group Configuration](images/5.2.orcl.png)
 
 ---
 
-### Step 2.3: Switch to Oracle User
+### Step 2.2: X11 Display Forwarding & Oracle 19c Enterprise Installation
+ To securely launch the Oracle Universal Installer (OUI) GUI from the terminal, X11 access control was disabled by the screen owner (`kushal`). After switching to the `oracle` user, exporting the display variable, and launching `./runInstaller`, the following enterprise-level configurations were defined in the GUI to build the infrastructure:
 
-The session was switched to the Oracle software owner before performing Oracle Database administration tasks.
+* **Installation Type:** Selected *Create and configure a single instance database* (Server Class, Enterprise Edition).
+* **Storage Allocation:** Mapped Oracle Base to `/u01/app/oracle` and Oracle Home to `/u01/app/oracle/product/19c/dbhome_1`.
+* **Multitenant Architecture:** Provisioned a Container Database (Global Database Name: **`ORCL`**) and a dedicated Pluggable Database (**`PDB1`**).
+* **Memory & Character Set:** Configured Automatic Memory Management (AMM) and set the database character set to `AL32UTF8`.
+* **Root Scripts Execution:** Suspended the installer midway to manually execute `orainstRoot.sh` and `root.sh` via the root terminal, finalizing OS-level privileges and inventory registration.
 
+**Commands Executed:**
 ```bash
+whoami  # (Verified user: kushal)
+xhost +
 su - oracle
+export DISPLAY=:0
+cd /u01/app/oracle/product/19c/dbhome_1
+./runInstaller
+
+
 ```
 
-The active user was verified using:
-
-```bash
-whoami
-```
-
-Expected output:
-
-```text
-oracle
-```
-
-![Oracle User Session](images/5.1.png)
+![Root login , oracle user creation, db installation ](images/5.orcl.png)
 
 ---
 
@@ -225,45 +194,39 @@ The Oracle Database installation and environment configuration were verified fro
 
 ---
 
-### Step 3.1: Verify Oracle Environment Variables
+### Step 3.1: Silent Installation Verification (opatch)
 
-The Oracle environment variables were checked.
+Bypassed the GUI and used Oracle's opatch utility to definitively prove that Oracle Database 19c (19.0.0.0.0) was successfully installed in the Oracle Home directory.
 
 ```bash
-echo $ORACLE_HOME
-echo $ORACLE_SID
-```
-
-The environment was configured for the Oracle 19c database.
-
-Example:
-
-```text
-ORACLE_HOME=/u01/app/oracle/product/19c/dbhome_1
-ORACLE_SID=ORCL
+/u01/app/oracle/product/19c/dbhome_1/OPatch/opatch lsinventory
 ```
 
 ![Oracle Environment Variables](images/6.orcl.png)
 
 ---
 
-### Step 3.2: Verify Oracle 19c Installation
+### Step 3.2: Logs, OS Packages, and Auto-Start Check
 
-The Oracle inventory was checked using the OPatch utility.
+Verified the installation logs exist, confirmed the Oracle pre-installation RPMs are present (which configure kernel limits), and checked /etc/oratab for instance registration.
+Commands Executed:
+
+Bash
 
 ```bash
-/u01/app/oracle/product/19c/dbhome_1/OPatch/opatch lsinventory
+ls -ltr /u01/app/oraInventory/logs/
+rpm -qa | grep oracle-database-preinstall
+cat /etc/oratab | grep -v "^#"
 ```
 
-This verifies the Oracle software installed inside the configured Oracle Home.
 
-![Oracle 19c Installation Verification](images/7.png)
+![Oracle 19c Installation Verification](images/7.orcl.png)
 
 ---
 
-### Step 3.3: Verify Oracle Environment Configuration
+### Step 3.3: Bash Profile Automation & Process Check
 
-The Oracle user's `.bash_profile` was checked.
+Verified the ~/.bash_profile for the oracle user to ensure $ORACLE_HOME and $ORACLE_SID load automatically. We then checked if the background process Monitor (pmon) was running.
 
 ```bash
 cat ~/.bash_profile
@@ -286,47 +249,14 @@ echo $ORACLE_SID
 echo $ORACLE_HOME
 ```
 
-![Oracle Bash Profile Configuration](images/8.png)
-
----
-
-### Step 3.4: Verify Oracle Background Process
-
 The Oracle Process Monitor was checked.
 
 ```bash
 ps -ef | grep pmon
 ```
-
-A running Oracle instance displays a process similar to:
-
-```text
-ora_pmon_ORCL
-```
-
-This confirms that the Oracle instance is running.
-
 ---
 
-### Step 3.5: Verify Oracle Logs and Configuration
-
-The Oracle inventory logs were checked.
-
-```bash
-ls -ltr /u01/app/oraInventory/logs/
-```
-
-The Oracle preinstallation package was verified.
-
-```bash
-rpm -qa | grep oracle-database-preinstall
-```
-
-The Oracle database registration file was checked.
-
-```bash
-cat /etc/oratab | grep -v "^#"
-```
+![Oracle Bash Profile Configuration](images/8.png)
 
 ---
 
